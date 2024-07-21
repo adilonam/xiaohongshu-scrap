@@ -1,61 +1,68 @@
-import datetime
-import json
-from time import sleep
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+import time
+import requests
+import re
 
-from playwright.sync_api import sync_playwright
+# Path to the ChromeDriver executable
+chrome_driver_path = './driver/chromedriver'
 
-from xhs import DataFetchError, XhsClient
+# Set up Chrome options
+chrome_options = Options()
+#chrome_options.add_argument('--headless')  # Run in headless mode (no GUI)
+chrome_options.add_argument('--incognito') 
+# Initialize the WebDriver with the specified path
+service = Service(chrome_driver_path)
+driver = webdriver.Chrome(service=service, options=chrome_options)
 
+try:
+    # Open the webpage
+    driver.get('https://www.xiaohongshu.com/explore/669539f6000000002500328f')
 
-def sign(uri, data=None, a1="", web_session=""):
-    for _ in range(10):
-        try:
-            with sync_playwright() as playwright:
-                stealth_js_path = "/Users/reajason/ReaJason/xhs/tests/stealth.min.js"
-                chromium = playwright.chromium
+    # Wait for the page to load completely
+    time.sleep(3)  # Adjust the sleep time as needed
 
-                # 如果一直失败可尝试设置成 False 让其打开浏览器，适当添加 sleep 可查看浏览器状态
-                browser = chromium.launch(headless=True)
-                print("hello")
-                browser_context = browser.new_context()
-                browser_context.add_init_script(path=stealth_js_path)
-                context_page = browser_context.new_page()
-                context_page.goto("https://www.xiaohongshu.com")
-                browser_context.add_cookies([
-                    {'name': 'a1', 'value': a1, 'domain': ".xiaohongshu.com", 'path': "/"}]
-                )
-                context_page.reload()
-                # 这个地方设置完浏览器 cookie 之后，如果这儿不 sleep 一下签名获取就失败了，如果经常失败请设置长一点试试
-                sleep(1)
-                encrypt_params = context_page.evaluate("([url, data]) => window._webmsxyw(url, data)", [uri, data])
-                return {
-                    "x-s": encrypt_params["X-s"],
-                    "x-t": str(encrypt_params["X-t"])
-                }
-        except Exception:
-            # 这儿有时会出现 window._webmsxyw is not a function 或未知跳转错误，因此加一个失败重试趴
-            pass
-    raise Exception("重试了这么多次还是无法签名成功，寄寄寄")
+    # Find all <script> elements
+    script_elements = driver.find_elements(By.TAG_NAME, 'script')
 
+    # Define the pattern to search for
+    pattern = re.compile(r'http:\\u002F\\u002Fsns-video-bd\.xhscdn\.com[^"]*\.mp4')
 
-if __name__ == '__main__':
-    xhs_client = XhsClient(sign=sign)
-    print(datetime.datetime.now())
-    phone = "login phone num"
-    res = xhs_client.send_code(phone)
-    print("验证码发送成功~")
-    code = input("请输入验证码：")
-    token = ""
-    while True:
-        try:
-            check_res = xhs_client.check_code(phone, code)
-            token = check_res["mobile_token"]
-            break
-        except DataFetchError as e:
-            print(e)
-            code = input("请输入验证码：")
-    login_res = xhs_client.login_code(phone, token)
-    print(json.dumps(login_res, indent=4))
-    print("当前 cookie：" + xhs_client.cookie)
+    for script in script_elements:
+        script_content = script.get_attribute('innerHTML')
+        
+        if script_content:
+            # Search for the pattern in the script content
+            matches = pattern.findall(script_content)
+            if matches:
+                match = matches[0].replace('\\u002F', '/')
+                print(f"Found matching URL: {match}")
+                
+                # Send a GET request to the URL
+                response = requests.get(match, stream=True)
 
-    print(xhs_client.get_self_info())
+                # Check if the request was successful
+                if response.status_code == 200:
+                    # Get total file size from headers
+                    total_size = int(response.headers.get('Content-Length', 0))
+                    downloaded_size = 0
+
+                    # Open a file to write the video content
+                    with open('./video/video.mp4', 'wb') as file:
+                        # Write the video content in chunks
+                        for chunk in response.iter_content(chunk_size=8192):
+                            file.write(chunk)
+                            downloaded_size += len(chunk)
+                            # Calculate and print the download progress
+                            progress = (downloaded_size / total_size) * 100
+                            print(f"Download progress: {progress:.2f}%")
+                    
+                    print('Download completed successfully.')
+                else:
+                    print('Failed to download video. Status code:', response.status_code)
+
+finally:
+    # Close the browser
+    driver.quit()
