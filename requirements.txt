@@ -1,0 +1,11 @@
+certifi==2024.7.4
+charset-normalizer==3.3.2
+greenlet==3.0.3
+idna==3.7
+lxml==5.2.2
+playwright==1.45.0
+pyee==11.1.0
+requests==2.32.3
+typing_extensions==4.12.2
+urllib3==2.2.2
+xhs==0.2.13
