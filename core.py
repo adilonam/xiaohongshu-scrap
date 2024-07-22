@@ -1,6 +1,10 @@
+import json
 import time
 import requests
 import re
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 import os
 
 from stem import Signal
@@ -8,7 +12,17 @@ from stem.control import Controller
 from selenium.webdriver.common.by import By
 
 class XhsClient:
-    def __init__(self, driver) -> None:
+    def __init__(self) -> None:
+        # Path to the ChromeDriver executable
+        chrome_driver_path = './driver/chromedriver'
+
+        # Set up Chrome options to use Tor proxy
+        chrome_options = Options()
+        chrome_options.add_argument('--proxy-server=socks5://localhost:9050')  # Use Tor proxy
+
+        # Initialize the WebDriver with the specified path
+        service = Service(chrome_driver_path)
+        driver = webdriver.Chrome(service=service, options=chrome_options)
         self.driver = driver
 
     def download_note_id(self, note_id):
@@ -74,7 +88,7 @@ class XhsClient:
                                 print(f"Download progress: {progress:.2f}%")
                         
                         print('Download completed successfully.')
-                        return {"title": page_title, "like": like_count, "path": video_path}
+                        return {"note_id" : note_id , "title": page_title, "like": like_count, "path": video_path}
                     else:
                         print('Failed to download video. Status code:', response.status_code)
                         return None
@@ -95,7 +109,7 @@ class XhsClient:
             print(f"Failed to renew Tor IP: {e}")
 
     def get_note_ids(self, url):
-        note_id_pattern = re.compile(r'"trackId":"(.*?)"')
+        note_id_pattern = re.compile(r'"type":"video".*?"trackId":"(.*?)"')
         
         try:
             # Open the webpage
@@ -115,4 +129,27 @@ class XhsClient:
                 return note_ids
         except Exception as e:
             print(f"An error occurred: {e}")
-        
+    def start(self, url):
+        data_path = './video/data.json'
+        # Check if the file exists
+        if os.path.exists(data_path):
+            # If it exists, read and parse the JSON data
+            with open(data_path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+        else:
+            # If it doesn't exist, initialize data as an empty list
+            data = []
+        while True:
+            note_ids = self.get_note_ids(url)
+            
+            for note_id in note_ids:
+                video_data = self.download_note_id(note_id)
+                if video_data:
+                    data.append(video_data)
+                    json_data = json.dumps(data, indent=2 , ensure_ascii=False)  # indent for pretty printing, optional
+                    # Write to a file (will replace contents if file exists)
+                    os.makedirs('./video', exist_ok=True)
+                    with open(data_path, 'w') as file:
+                        file.write(json_data)
+                print(f"video {note_id} added succesfly")
+            
