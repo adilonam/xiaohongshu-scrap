@@ -1,15 +1,39 @@
-import requests
+import time
+import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+import pandas as pd
 
-def download_video(url, file_name):
-    response = requests.get(url, stream=True)
-    if response.status_code == 200:
-        with open(file_name, 'wb') as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                file.write(chunk)
-        print(f"Video downloaded successfully: {file_name}")
-    else:
-        print("Failed to download video")
+# Set up options for Chrome to avoid detection
+options = uc.ChromeOptions()
+options.add_argument("--disable-blink-features=AutomationControlled")
+options.add_argument("start-maximized")
+options.add_argument("disable-infobars")
+options.add_argument("--disable-extensions")
+options.add_argument("--profile-directory=Default")
+options.add_argument("--disable-plugins-discovery")
+options.add_argument("--incognito")
 
-# Replace 'actual_video_url' with the real URL of the video
-video_url = 'https://www.xiaohongshu.com/07afd315-94b6-4e3a-be43-c6874456f0ef'
-download_video(video_url, 'downloaded_video.mp4')
+# Launch the browser with the specified options
+driver = uc.Chrome(options=options)
+driver.get("https://www.xiaohongshu.com/user/profile/652a4291000000002a02a4ea")
+
+# Wait for manual interaction
+input("Press 'OK' after clicking on the videos to open in new tabs")
+
+# Get all open tabs
+tabs = driver.window_handles
+
+# Collect URLs of all open tabs
+urls = []
+for tab in tabs:
+    driver.switch_to.window(tab)
+    urls.append(driver.current_url)
+
+# Save URLs to an Excel file
+df = pd.DataFrame(urls, columns=["URLs"])
+df.to_excel("video_links.xlsx", index=False)
+
+# Close the browser
+driver.quit()
+
+print("Links saved in 'video_links.xlsx' and browser closed.")

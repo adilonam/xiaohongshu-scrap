@@ -1,28 +1,25 @@
 import json
-import time
+import openpyxl
 import requests
 import re
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
 import os
-
-from stem import Signal
-from stem.control import Controller
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
+
 
 class XhsClient:
     def __init__(self) -> None:
-        # Path to the ChromeDriver executable
-        chrome_driver_path = './driver/chromedriver'
+        options = uc.ChromeOptions()
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("start-maximized")
+        options.add_argument("disable-infobars")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--profile-directory=Default")
+        options.add_argument("--disable-plugins-discovery")
+        options.add_argument("--incognito")
 
-        # Set up Chrome options to use Tor proxy
-        chrome_options = Options()
-        chrome_options.add_argument('--proxy-server=socks5://localhost:9050')  # Use Tor proxy
-
-        # Initialize the WebDriver with the specified path
-        service = Service(chrome_driver_path)
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+        # Launch the browser with the specified options
+        driver = uc.Chrome(options=options)
         self.driver = driver
 
     def download_note_id(self, note_id):
@@ -59,14 +56,10 @@ class XhsClient:
                     
                     print(f"Found matching URL: {video_url} | Title: {page_title} | Likes: {like_count}")
 
-                    # Configure requests to use Tor proxy
-                    proxies = {
-                        'http': 'socks5://localhost:9050',
-                        'https': 'socks5://localhost:9050'
-                    }
+                    
 
                     # Download video
-                    response = requests.get(video_url, stream=True, proxies=proxies)
+                    response = requests.get(video_url, stream=True)
 
                     if response.status_code == 200:
                         # Get total file size from headers
@@ -100,13 +93,6 @@ class XhsClient:
             print(f"An error occurred: {e}")
             return None
 
-    def renew_tor_ip(self):
-        try:
-            with Controller.from_port(port=9051) as controller:
-                controller.authenticate(password='your_tor_password')  # Replace with your Tor password if set
-                controller.signal(Signal.NEWNYM)
-        except Exception as e:
-            print(f"Failed to renew Tor IP: {e}")
 
     def get_note_ids(self, url):
         note_id_pattern = re.compile(r'"type":"video".*?"trackId":"(.*?)"')
@@ -129,7 +115,9 @@ class XhsClient:
                 return note_ids
         except Exception as e:
             print(f"An error occurred: {e}")
-    def start(self, url):
+    
+    def start(self, excel_path = "./excel/video_links.xlsx"):
+        os.makedirs('./video', exist_ok=True)
         data_path = './video/data.json'
         # Check if the file exists
         if os.path.exists(data_path):
@@ -139,16 +127,32 @@ class XhsClient:
         else:
             # If it doesn't exist, initialize data as an empty list
             data = []
-        while True:
-            note_ids = self.get_note_ids(url)
-            
-            for note_id in note_ids:
+        
+        workbook = openpyxl.load_workbook(excel_path)
+
+        # Get the active sheet
+        sheet = workbook.active
+
+        # Get the first column as an array
+        first_column = []
+        for cell in sheet['A']:
+            first_column.append(cell.value)
+
+        # Print the first column
+        print(first_column)
+        
+        
+        for url in first_column:
+            note_id_pattern = re.compile(r'https://www\.xiaohongshu\.com/explore/([a-zA-Z0-9]+)')
+            note_id_match = note_id_pattern.search(url)
+            if note_id_match:
+                note_id = note_id_match.group(1)
                 video_data = self.download_note_id(note_id)
                 if video_data:
                     data.append(video_data)
                     json_data = json.dumps(data, indent=2 , ensure_ascii=False)  # indent for pretty printing, optional
                     # Write to a file (will replace contents if file exists)
-                    os.makedirs('./video', exist_ok=True)
+                    
                     with open(data_path, 'w') as file:
                         file.write(json_data)
                 print(f"video {note_id} added succesfly")
