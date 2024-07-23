@@ -152,15 +152,15 @@ class XhsClient:
                     data.append(video_data)
                     json_data = json.dumps(data, indent=2 , ensure_ascii=False)  # indent for pretty printing, optional
                     # Write to a file (will replace contents if file exists)
-                     # Check for problematic characters
+                    print(json_data)
+            
                     try:
-                        json_data.encode('utf-8')
+                        # Write to a file (will replace contents if file exists)
+                        with open(data_path, 'w', encoding='utf-8') as file:
+                            file.write(json_data)
                     except UnicodeEncodeError as e:
+                        print(f"UnicodeEncodeError: {e}")
                         problematic_chars = json_data[e.start:e.end]
                         print(f"Problematic characters: {problematic_chars}")
-                        # Replace or remove problematic characters
-                        json_data = json_data.replace(problematic_chars, '')
-                    with open(data_path, 'w', encoding='utf-8') as file:
-                        file.write(json_data)
-                print(f"video {note_id} added succesfly")
+                    print(f"video {note_id} added successfully")
             
