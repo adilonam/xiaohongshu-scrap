@@ -153,7 +153,7 @@ class XhsClient:
                     json_data = json.dumps(data, indent=2 , ensure_ascii=False)  # indent for pretty printing, optional
                     # Write to a file (will replace contents if file exists)
                     
-                    with open(data_path, 'w') as file:
+                    with open(data_path, 'w', encoding='utf-8') as file:
                         file.write(json_data)
                 print(f"video {note_id} added succesfly")
             
