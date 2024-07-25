@@ -7,7 +7,6 @@ def main():
     
     xhs_client = XhsClient()
     xhs_client.start()
-    # xhs_client.start(url)
     
 
 if __name__ == "__main__":

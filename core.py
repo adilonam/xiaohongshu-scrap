@@ -35,6 +35,7 @@ class XhsClient:
             # Find the <script> element that contains video info
             script_element = self.driver.find_element(By.XPATH, '/html/body/script[3]')
             
+            
             page_title = self.driver.title
             like_count = "None"
 
@@ -48,13 +49,15 @@ class XhsClient:
                 url_match = url_pattern.search(script_content)
                 like_match = like_pattern.search(script_content)
                 
+                description = self.driver.find_element(By.XPATH , '//*[@id="detail-desc"]').get_attribute('innerText')
+                
                 if like_match:
                     like_count = like_match.group(1)
                     
                 if url_match:
                     video_url = url_match.group().replace('\\u002F', '/')
                     
-                    print(f"Found matching URL: {video_url} | Title: {page_title} | Likes: {like_count}")
+                    print(f"Found matching URL: {video_url} | Title: {page_title} ")
 
                     
 
@@ -81,7 +84,7 @@ class XhsClient:
                                 print(f"Download progress: {progress:.2f}%")
                         
                         print('Download completed successfully.')
-                        return {"note_id" : note_id , "title": page_title, "like": like_count, "path": video_path}
+                        return {"note_id" : note_id , "title": page_title, "like": like_count, 'description': description, "path": video_path}
                     else:
                         print('Failed to download video. Status code:', response.status_code)
                         return None
